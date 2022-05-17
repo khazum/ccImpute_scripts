@@ -17,7 +17,7 @@ suppressPackageStartupMessages({
     library(caret)
 })
 
-devtools::install_github("khazum/ccImpute_exp")
+# devtools::install_github("khazum/ccImpute_exp")
 
 impute <- function(method, X, X_log, labels, num_clusters, dataset) {
     start_time <- Sys.time()
@@ -84,20 +84,22 @@ impute <- function(method, X, X_log, labels, num_clusters, dataset) {
     
     if(cells > 1000){
         print("Reducing rank")
-        pca_red <- prcomp(as.matrix(xlog_t), rank. = 1000, center = TRUE, scale = TRUE)$x
+        pca_red <- prcomp(as.matrix(xlog_t), rank. = 1000)$x
         restarts <- 50
         
     }
     else{
-        pca_red <- prcomp(as.matrix(xlog_t), center = TRUE, scale = TRUE)$x
+        pca_red <- prcomp(as.matrix(xlog_t))$x
         if (ncol(t(as.matrix(xlog_t))) <= p*2){
             p <- 9
         }
         restarts <- 1000
     }
     
+    tsne_red <- Rtsne(as.matrix(xlog_t), perplexity = p, check_duplicates = FALSE)$Y
+    
     cl <- parallel::makeCluster(6, outfile = "")
-    doParallel::registerDoParallel(cl, cores = 5)
+    doParallel::registerDoParallel(cl, cores = 6)
     
     # calculate distances in parallel
     results <- foreach::foreach(i = 1:6, .combine=c, .packages = c("mclust","Rtsne", "cluster", "caret", "e1071")) %dopar% {
@@ -110,7 +112,6 @@ impute <- function(method, X, X_log, labels, num_clusters, dataset) {
             )$cluster,
             labels)
         }else if(i==2){
-            tsne_red <- Rtsne(as.matrix(xlog_t), perplexity = p, check_duplicates = FALSE)$Y
             adjustedRandIndex(kmeans(
                 tsne_red,
                 centers = num_clusters,
@@ -127,41 +128,56 @@ impute <- function(method, X, X_log, labels, num_clusters, dataset) {
             as.numeric(summary(silh)['avg.width'])
         }
         else if(i==4){
-            factor_labels <- as.factor(labels)
-            folds = caret::createFolds(factor_labels, k = 10)
-            cv = lapply(folds, function(x) { # start of function
-                classifier = e1071::svm(x = pca_red[-x,1:2], y = factor_labels[-x], type = "C-classification", kernel = "linear")
-                y_pred = predict(classifier, pca_red[x,1:2])
-                cm = table(factor_labels[x], y_pred)
-                accuracy = sum(diag(cm)) / sum(cm)
-                return(accuracy)
+            factor_labels4 <- as.factor(labels)
+            folds4 = caret::createFolds(factor_labels4, k = 10)
+
+            cv4 = lapply(folds4, function(x) { # start of function
+                train_labels4 <- factor_labels4[-x]
+                classifier4 = e1071::svm(x = pca_red[-x,1:2], y = train_labels4, type = "C-classification", kernel = "linear")
+                if(length(x) == 1){
+                  x = rep(x,2)
+                }
+                y_pred4 = predict(classifier4, as.matrix(pca_red[x,1:2]))
+                test_labels4 <- factor_labels4[x]
+                cm4 = table(test_labels4, y_pred4)
+                accuracy4 = sum(diag(cm4)) / sum(cm4)
+                return(accuracy4)
             })
-            mean(as.numeric(cv))
+            round(mean(as.numeric(cv4)), digits = 4)
         }
         else if(i==5){
-            factor_labels <- as.factor(labels)
-            folds = caret::createFolds(factor_labels, k = 10)
-            cv = lapply(folds, function(x) { # start of function
-                classifier = e1071::svm(x = pca_red[-x,1:4], y = factor_labels[-x], type = "C-classification", kernel = "linear")
-                y_pred = predict(classifier, pca_red[x,1:4])
-                cm = table(factor_labels[x], y_pred)
-                accuracy = sum(diag(cm)) / sum(cm)
-                return(accuracy)
+            factor_labels5 <- as.factor(labels)
+            folds5 = caret::createFolds(factor_labels5, k = 10)
+            cv5 = lapply(folds5, function(x) { # start of function
+                train_labels5 <- factor_labels5[-x]
+                classifier5 = e1071::svm(x = pca_red[-x,1:4], y = train_labels5, type = "C-classification", kernel = "linear")
+                if(length(x) == 1){
+                    x = rep(x,2)
+                }
+                y_pred5 = predict(classifier5, as.matrix(pca_red[x,1:4]))
+                test_labels5 <- factor_labels5[x]
+                cm5 = table(test_labels5, y_pred5)
+                accuracy5 = sum(diag(cm5)) / sum(cm5)
+                return(accuracy5)
             })
-            mean(as.numeric(cv))
+            round(mean(as.numeric(cv5)), digits = 4)
         }
         else if(i==6){
-            tsne_red <- Rtsne(as.matrix(xlog_t), perplexity = p, check_duplicates = FALSE)$Y
-            factor_labels <- as.factor(labels)
-            folds = caret::createFolds(factor_labels, k = 10)
-            cv = lapply(folds, function(x) { # start of function
-                classifier = e1071::svm(x = tsne_red[-x,], y = factor_labels[-x], type = "C-classification", kernel = "linear")
-                y_pred = predict(classifier, tsne_red[x,])
-                cm = table(factor_labels[x], y_pred)
-                accuracy = sum(diag(cm)) / sum(cm)
-                return(accuracy)
+            factor_labels6 <- as.factor(labels)
+            folds6 = caret::createFolds(factor_labels6, k = 10)
+            cv6 = lapply(folds6, function(x) { # start of function
+                train_labels6 <- factor_labels6[-x]
+                classifier6 = e1071::svm(x = tsne_red[-x,], y = train_labels6, type = "C-classification", kernel = "linear")
+                if(length(x) == 1){
+                    x = rep(x,2)
+                }
+                y_pred6 = predict(classifier6, as.matrix(tsne_red[x,]))
+                test_labels6 <- factor_labels6[x]
+                cm6 = table(test_labels6, y_pred6)
+                accuracy6 = sum(diag(cm6)) / sum(cm6)
+                return(accuracy6)
             })
-            mean(as.numeric(cv))
+            round(mean(as.numeric(cv6)), digits = 4)
         }
     }
     
@@ -204,6 +220,6 @@ driver <- function(method, dataset, repeats){
 }
 
 args = commandArgs(trailingOnly=TRUE)
-# args = c("ccImpute", "usoskin", 1)
-# driver(args[1],args[2],strtoi(args[3], base=10L))
+# args = c("ccImpute", "blakeley", 1)
+driver(args[1],args[2],strtoi(args[3], base=10L))
 
