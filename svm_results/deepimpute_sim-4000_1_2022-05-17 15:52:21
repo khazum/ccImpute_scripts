@@ -1,0 +1,18 @@
+c1,c2,time, prop_zeroes removed, silh_pca_avr
+deepimpute sim-4000 1 || Genes(rows): 19803 Cells(cols): 4000 ||
+-1.47673181057929e-05
+0.947730732627584
+0.89
+1
+0.994
+286.387273788452
+0.731275337070141
+0.00880015775595281
+NA
+NA
+NA
+NA
+NA
+NA
+NA
+NA
